@@ -885,6 +885,10 @@ function renderProjectProgress() {
 function startFocusTimer() {
   const t = state.tasks.find((x) => x.id === state.log_project_id);
   if (!t) return;
+  if (state.active_timer) {
+    const activeTaskExists = state.tasks.some((x) => x.id === state.active_timer.task_id);
+    if (!activeTaskExists) state.active_timer = null;
+  }
   const today = todayIso();
   const weekDays = currentWeekDatesMonFri();
   const idx = weekDays.findIndex((d) => d === today);
@@ -903,8 +907,9 @@ function renderFocusTimer() {
   const startBtn = document.getElementById("timerStartBtn");
   const pauseBtn = document.getElementById("timerPauseBtn");
   const stopBtn = document.getElementById("timerStopBtn");
+  const badge = document.getElementById("timerStateBadge");
   const status = document.getElementById("timerStatusText");
-  if (!startBtn || !pauseBtn || !stopBtn || !status) return;
+  if (!startBtn || !pauseBtn || !stopBtn || !status || !badge) return;
   const hasFocus = Boolean(state.tasks.find((x) => x.id === state.log_project_id));
   const active = state.active_timer;
   const isRunning = Boolean(active && active.started_at);
@@ -916,15 +921,35 @@ function renderFocusTimer() {
   stopBtn.disabled = !active;
 
   if (!active) {
+    badge.textContent = "STOPPED";
+    badge.className = "timer-state timer-state-idle";
     status.textContent = hasFocus ? "Ready to track time." : "Select a focus project first.";
     return;
   }
 
   const timerTask = state.tasks.find((x) => x.id === active.task_id);
+  if (!timerTask) {
+    badge.textContent = "STOPPED";
+    badge.className = "timer-state timer-state-idle";
+    state.active_timer = null;
+    status.textContent = hasFocus
+      ? "Recovered from stale timer state. Press Start to begin for selected focus project."
+      : "Select a focus project first.";
+    scheduleSave();
+    return;
+  }
   const elapsed = currentElapsedMs(active);
-  const stateLabel = isRunning ? "Running" : "Paused";
   const name = timerTask ? timerTask.title : "Unknown project";
-  status.textContent = `${stateLabel}: ${name} | ${formatElapsed(elapsed)} elapsed`;
+  if (isRunning) {
+    badge.textContent = "RUNNING";
+    badge.className = "timer-state timer-state-running";
+  } else {
+    badge.textContent = "PAUSED";
+    badge.className = "timer-state timer-state-paused";
+  }
+  const started = parseIsoDate(active.started_at);
+  const startedText = started ? `Started at ${toClockLocal(started)}` : "Paused";
+  status.textContent = `${name} | ${formatElapsed(elapsed)} elapsed | ${startedText}`;
 }
 
 function render() {

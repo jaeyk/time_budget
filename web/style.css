@@ -121,6 +121,37 @@ th, td { border-bottom: 1px solid var(--line); padding: 6px; text-align: left; w
 .progress-wrap {
   margin: 6px 0 12px;
 }
+.timer-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.timer-state {
+  display: inline-block;
+  min-width: 86px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+.timer-state-running {
+  color: #0b6b3a;
+  background: #dcfce7;
+  border: 1px solid #86efac;
+}
+.timer-state-paused {
+  color: #7a4c00;
+  background: #ffedd5;
+  border: 1px solid #fdba74;
+}
+.timer-state-idle {
+  color: #6b7280;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+}
 .data-actions {
   margin-top: 8px;
   display: flex;

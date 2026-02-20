@@ -53,6 +53,7 @@ Timer behavior now lives in a separate section:
 - **Focus Timer + Progress** supports `start`, `pause`, and `stop`.
 - Stopped sessions update today's log row for the selected focus project.
 - Each project also stores cumulative tracked hours across weeks.
+- If a timer references a removed/invalid project, the app clears the stale timer state automatically.
 
 ## Dashboard
 
