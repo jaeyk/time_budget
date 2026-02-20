@@ -1,0 +1,4 @@
+Task ID,Title,Domain,Status,Impact,Urgency,Effort,Risk,Burner Score,Paused,Freeze Date,Progress %,Next Step,Drift Rate (hrs/week),Restart Overhead (hrs),Remaining Base Work (hrs),Paused Weeks,Catch-up Hours,Allocated Hours/Week,Required Hours/Week,Allocation Gap (hrs/week),Deadline,Deferral Risk Note,Owner,Created At,Updated At
+KB-001,Write chapter outline,Research,Backlog,4,3,2,2,5,no,,10,Finalize chapter list,1.5,1.0,12,0,13.0,3.0,1.62,1.38,2026-04-15,Low risk if paused <2 weeks,JK,2026-02-20,2026-02-20
+KB-002,Revise intro section,Research,Ready,5,4,3,3,6,yes,2026-02-13,60,Re-read notes and edit transitions,2.0,2.0,8,1,12.0,2.0,6.00,-4.00,2026-03-05,Context fades quickly due to narrative thread,JK,2026-02-20,2026-02-20
+KB-003,Prepare emergency client deck,Teaching,Doing,5,5,2,4,8,no,,20,Finish 3 priority slides,0.5,0.5,6,0,6.5,8.0,16.25,-8.25,2026-02-24,High business impact if late,JK,2026-02-20,2026-02-20

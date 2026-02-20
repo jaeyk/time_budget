@@ -1,0 +1,100 @@
+{
+  "budgets": {
+    "Research": 20,
+    "Teaching": 10,
+    "Service": 0,
+    "Admin": 0,
+    "Other": 0
+  },
+  "tasks": [
+    {
+      "id": "KB-400768",
+      "title": "FAS policy memo revision",
+      "domain": "Research",
+      "status": "Doing",
+      "impact": "High",
+      "start_date": "2026-02-20",
+      "deadline": "2026-02-21",
+      "research_split": 98,
+      "daily_plan": [
+        0,
+        0,
+        0,
+        0,
+        20
+      ],
+      "daily_actual": [
+        0,
+        0,
+        0,
+        0,
+        0.0005316666666666666
+      ],
+      "daily_start": [
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      "daily_end": [
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      "committed_hours": 20,
+      "baseline_deadline": "2026-02-21",
+      "debt_hours": 0
+    },
+    {
+      "id": "KB-397208",
+      "title": "Finish Your App revision",
+      "domain": "Research",
+      "status": "Backlog",
+      "impact": "High",
+      "start_date": "2026-02-20",
+      "deadline": "2026-03-14",
+      "research_split": 0,
+      "daily_plan": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "daily_actual": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "daily_start": [
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      "daily_end": [
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      "committed_hours": 0,
+      "baseline_deadline": "2026-03-14",
+      "debt_hours": 0
+    }
+  ],
+  "updated_at": "2026-02-20T06:18:29.352923+00:00",
+  "weekly_hours": 0,
+  "daily_hours": 6,
+  "time_debt_hours": 240,
+  "last_week_key": "2026-02-16",
+  "active_timer": null,
+  "log_project_id": "KB-400768"
+}

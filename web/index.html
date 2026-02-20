@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TimeBudget</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+
+<body>
+  <main>
+    <h1>TimeBudget</h1>
+    <p class="muted">Set weekly hours, split them across responsibilities, then prioritize research by impact first (Eat
+      the Frog)</p>
+    <ol class="mini-steps">
+      <li>Decide total work hours for this week.</li>
+      <li>Allocate those hours across Research, Teaching, Service, and Admin.</li>
+      <li>Within Research, do the highest-impact project first.</li>
+    </ol>
+
+    <section class="panel">
+      <h2>1) Set Daily Work Time</h2>
+      <p class="muted">Set a realistic number of hours you can work each weekday.</p>
+      <div class="grid">
+        <label>How many hours can you work per weekday? <input id="dailyHours" type="number" step="0.5" min="0" /></label>
+        <div id="weeklySummary" class="muted"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>2) Allocation By Responsibility</h2>
+      <div id="budgets" class="grid"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Add Project</h2>
+      <p class="muted">Dates: Start = when you actually begin this project. Target End = your self-imposed finish date used to estimate urgency and make-up debt.</p>
+      <div class="grid add-form">
+        <input id="newTitle" placeholder="Project title" />
+        <select id="newDomain">
+          <option>Research</option>
+          <option>Teaching</option>
+          <option>Service</option>
+          <option>Admin</option>
+          <option>Other</option>
+        </select>
+        <select id="newImpact">
+          <option value="High">High Impact</option>
+          <option value="Medium">Medium Impact</option>
+          <option value="Low">Low Impact</option>
+        </select>
+        <input id="newStartDate" type="date" title="Start date: when you actually begin this project" aria-label="Start date" />
+        <input id="newDeadline" type="date" title="Target end date: your self-imposed finish date" aria-label="Target end date" />
+        <button id="addBtn">Add</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>3) Project Dashboard (Kanban)</h2>
+      <p class="muted">Projects are grouped by status so you can see flow at a glance.</p>
+      <div id="kanbanBoard" class="kanban-board"></div>
+      <div id="editorPanel" class="panel hidden">
+        <h3>Edit Project Metadata</h3>
+        <div class="grid">
+          <input id="editTitle" placeholder="Project title" />
+          <select id="editDomain">
+            <option>Research</option>
+            <option>Teaching</option>
+            <option>Service</option>
+            <option>Admin</option>
+            <option>Other</option>
+          </select>
+          <select id="editImpact">
+            <option value="High">High Impact</option>
+            <option value="Medium">Medium Impact</option>
+            <option value="Low">Low Impact</option>
+          </select>
+          <input id="editStartDate" type="date" />
+          <input id="editDeadline" type="date" />
+          <input id="editResearchSplit" type="number" min="0" max="100" step="1" placeholder="Research split (%)" />
+        </div>
+        <div class="editor-actions">
+          <button id="saveEditBtn">Save</button>
+          <button id="cancelEditBtn" type="button">Cancel</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>4) Weekly Execution Log</h2>
+      <p class="muted">Planned hours are based on Research budget + project split. Log timer start/end and actual time by day.</p>
+      <div id="executionDebtSummary" class="muted"></div>
+      <div class="log-focus">
+        <label>Focus Project <select id="logProjectSelect"></select></label>
+      </div>
+      <div class="progress-wrap">
+        <div id="logProgressText" class="muted"></div>
+        <div class="progress-bar"><div id="logProgressFill" class="progress-fill"></div></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Day</th>
+              <th>Planned</th>
+              <th>Start</th>
+              <th>End</th>
+              <th>Actual Spent</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="logBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <p id="saveState" class="muted"></p>
+    <p class="site-credit">
+      Developed by
+      <a href="https://jaeyk.github.io/" target="_blank" rel="noopener noreferrer">Jae Yeon Kim (2026)</a>
+    </p>
+  </main>
+  <script src="/app.js"></script>
+</body>
+
+</html>

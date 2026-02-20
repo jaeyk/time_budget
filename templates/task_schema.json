@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kanban-burner.local/task.schema.json",
+  "title": "Kanban Burner Task",
+  "description": "Schema for a single task row represented as JSON.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_id",
+    "title",
+    "domain",
+    "status",
+    "impact",
+    "urgency",
+    "effort",
+    "risk",
+    "burner_score",
+    "paused",
+    "progress_percent",
+    "drift_rate_hours_per_week",
+    "restart_overhead_hours",
+    "remaining_base_work_hours",
+    "paused_weeks",
+    "catch_up_hours",
+    "allocated_hours_per_week",
+    "required_hours_per_week",
+    "allocation_gap_hours_per_week",
+    "owner",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "pattern": "^[A-Z]{2,5}-[0-9]{3,}$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 3
+    },
+    "domain": {
+      "type": "string",
+      "enum": ["Research", "Teaching", "Service", "Admin", "Other"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["Backlog", "Ready", "Doing", "Done"]
+    },
+    "impact": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "urgency": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "effort": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "risk": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "burner_score": {
+      "type": "number",
+      "description": "Simple model: (impact + urgency) - effort"
+    },
+    "paused": {
+      "type": "boolean"
+    },
+    "freeze_date": {
+      "type": ["string", "null"],
+      "format": "date"
+    },
+    "progress_percent": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "next_step": {
+      "type": ["string", "null"]
+    },
+    "drift_rate_hours_per_week": {
+      "type": "number",
+      "minimum": 0
+    },
+    "restart_overhead_hours": {
+      "type": "number",
+      "minimum": 0
+    },
+    "remaining_base_work_hours": {
+      "type": "number",
+      "minimum": 0
+    },
+    "paused_weeks": {
+      "type": "number",
+      "minimum": 0
+    },
+    "catch_up_hours": {
+      "type": "number",
+      "minimum": 0,
+      "description": "remaining_base_work_hours + (paused_weeks * drift_rate_hours_per_week) + restart_overhead_hours"
+    },
+    "allocated_hours_per_week": {
+      "type": "number",
+      "minimum": 0
+    },
+    "required_hours_per_week": {
+      "type": "number",
+      "minimum": 0
+    },
+    "allocation_gap_hours_per_week": {
+      "type": "number"
+    },
+    "deadline": {
+      "type": ["string", "null"],
+      "format": "date"
+    },
+    "deferral_risk_note": {
+      "type": ["string", "null"]
+    },
+    "owner": {
+      "type": "string",
+      "minLength": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "paused": { "const": true }
+        }
+      },
+      "then": {
+        "required": ["freeze_date", "next_step"]
+      }
+    }
+  ]
+}
