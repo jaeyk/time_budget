@@ -383,10 +383,24 @@ function persistStateSync(updateUi = true) {
   }
 }
 
+async function mirrorStateToServer() {
+  try {
+    const res = await fetch("/api/state", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(state),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 async function saveState() {
   const el = document.getElementById("saveState");
   try {
     persistStateSync(true);
+    await mirrorStateToServer();
   } catch (err) {
     const msg = err && err.message ? err.message : "unknown";
     if (el) el.textContent = `Local save error: ${msg}`;
@@ -394,11 +408,18 @@ async function saveState() {
 }
 
 function scheduleSave() {
+  try {
+    persistStateSync(true);
+  } catch (err) {
+    const msg = err && err.message ? err.message : "unknown";
+    const el = document.getElementById("saveState");
+    if (el) el.textContent = `Local save error: ${msg}`;
+  }
   if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
+  saveTimer = setTimeout(async () => {
     saveTimer = null;
-    saveState();
-  }, 250);
+    await mirrorStateToServer();
+  }, 120);
 }
 
 function setDataStatus(text, klass = "muted") {
@@ -967,6 +988,7 @@ document.addEventListener("keydown", (e) => {
       saveTimer = null;
     }
     persistStateSync(true);
+    mirrorStateToServer();
     setDataStatus("Forced local save completed (Cmd/Ctrl+S).", "good");
   } catch (err) {
     const msg = err && err.message ? err.message : "unknown";

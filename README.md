@@ -70,7 +70,7 @@ Kanban cards support:
 
 Notes:
 - `localStorage` is browser-specific. Different browser/device starts empty until you import JSON.
-- Server-side `data/state.json` may still exist for legacy compatibility, but active persistence is local-first in the browser.
+- When running the local Python server, saves are also mirrored to `data/state.json` for local relaunch consistency.
 
 ## Note
 
