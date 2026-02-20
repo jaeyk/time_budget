@@ -63,6 +63,7 @@ Kanban cards support:
 ## Data Storage
 
 - Primary store: browser `localStorage` (auto-save on edits and timer events).
+- Force save shortcut: `Cmd+S` (Mac) or `Ctrl+S` (Windows/Linux) writes immediately to local storage.
 - Export/Import: use **0) Local Data + Backup** in the app.
   - `Export JSON` always exports the latest in-memory state.
   - `Import JSON` restores state from a previous export.

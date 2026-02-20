@@ -956,3 +956,21 @@ document.addEventListener("visibilitychange", () => {
     try { persistStateSync(false); } catch {}
   }
 });
+
+document.addEventListener("keydown", (e) => {
+  const isSaveCombo = (e.metaKey || e.ctrlKey) && String(e.key).toLowerCase() === "s";
+  if (!isSaveCombo) return;
+  e.preventDefault();
+  try {
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+    }
+    persistStateSync(true);
+    setDataStatus("Forced local save completed (Cmd/Ctrl+S).", "good");
+  } catch (err) {
+    const msg = err && err.message ? err.message : "unknown";
+    const el = document.getElementById("saveState");
+    if (el) el.textContent = `Force save error: ${msg}`;
+  }
+});
