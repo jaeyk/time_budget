@@ -40,4 +40,5 @@ python3 scripts/webapp.py
 Open `http://127.0.0.1:8765`.
 
 Memory:
-- The app auto-saves to `data/state.json`.
+- The app auto-saves to browser `localStorage`.
+- For cross-device use, export JSON from `0) Local Data + Backup` and import it on the other browser/device.

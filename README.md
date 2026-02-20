@@ -10,6 +10,20 @@ python3 scripts/webapp.py
 
 Open `http://127.0.0.1:8765`.
 
+## Deploy (GitHub Pages)
+
+This repo includes a GitHub Actions workflow at `.github/workflows/deploy-pages.yml` that deploys the `web/` folder.
+
+1. Push to `main`.
+2. In GitHub repo settings, go to `Settings -> Pages`.
+3. Set `Source` to `GitHub Actions`.
+4. After the workflow runs, your site will be available at:
+   - `https://<your-username>.github.io/<repo-name>/`
+
+Notes:
+- The app is static and local-first (`localStorage`), so data is saved per browser/device.
+- Use `Export JSON` / `Import JSON` to move data across devices.
+
 ## Current Workflow
 
 1. Set daily work capacity (Mon-Fri).
@@ -48,8 +62,14 @@ Kanban cards support:
 
 ## Data Storage
 
-- Local state file: `data/state.json`
-- Auto-save on edits and timer events
+- Primary store: browser `localStorage` (auto-save on edits and timer events).
+- Export/Import: use **0) Local Data + Backup** in the app.
+  - `Export JSON` creates a portable backup file.
+  - `Import JSON` restores state from a previous export.
+
+Notes:
+- `localStorage` is browser-specific. Different browser/device starts empty until you import JSON.
+- Server-side `data/state.json` may still exist for legacy compatibility, but active persistence is local-first in the browser.
 
 ## Note
 

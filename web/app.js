@@ -3,9 +3,12 @@ const IMPACT_LEVELS = ["High", "Medium", "Low"];
 const IMPACT_WEIGHT = { High: 3, Medium: 2, Low: 1 };
 const STATUSES = ["Backlog", "Ready", "Doing", "Done"];
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+const STORAGE_KEY = "timebudget_state_v1";
 
 let state = {
   daily_hours: 8,
+  pomodoro_work_min: 25,
+  pomodoro_break_min: 5,
   budgets: {},
   tasks: [],
   last_week_key: null,
@@ -17,10 +20,21 @@ let state = {
 let saveTimer = null;
 let editingTaskId = null;
 let timerTickHandle = null;
+let draggingTaskId = null;
 
 function num(v, d = 0) {
   const n = Number(v);
   return Number.isFinite(n) ? n : d;
+}
+
+function normalizeStateShape() {
+  if (!state.budgets) state.budgets = {};
+  if (!state.tasks) state.tasks = [];
+  if (!state.active_timer) state.active_timer = null;
+  state.pomodoro_work_min = Math.max(1, num(state.pomodoro_work_min, 25));
+  state.pomodoro_break_min = Math.max(1, num(state.pomodoro_break_min, 5));
+  if (state.log_project_id == null) state.log_project_id = null;
+  if (!state.last_week_key) state.last_week_key = currentWeekKey();
 }
 
 function fmt(n) {
@@ -177,7 +191,72 @@ function normalizeTask(t) {
     committed_hours: num(t.committed_hours, 0),
     baseline_deadline: t.baseline_deadline || (t.deadline || ""),
     debt_hours: num(t.debt_hours, 0),
+    kanban_order: num(t.kanban_order, 0),
   };
+}
+
+function sortKanbanItems(items) {
+  return items.slice().sort((a, b) => {
+    const oa = num(a.kanban_order, 0);
+    const ob = num(b.kanban_order, 0);
+    if (oa !== ob) return oa - ob;
+    return a.title.localeCompare(b.title);
+  });
+}
+
+function reindexStatus(status) {
+  const items = sortKanbanItems(state.tasks.filter((t) => t.status === status));
+  items.forEach((t, idx) => { t.kanban_order = idx + 1; });
+}
+
+function ensureKanbanOrder() {
+  STATUSES.forEach((status) => {
+    const items = sortKanbanItems(state.tasks.filter((t) => t.status === status));
+    items.forEach((t, idx) => {
+      if (!Number.isFinite(num(t.kanban_order, NaN)) || num(t.kanban_order, 0) <= 0) {
+        t.kanban_order = idx + 1;
+      }
+    });
+    reindexStatus(status);
+  });
+}
+
+function moveTaskToColumnEnd(taskId, targetStatus) {
+  const task = state.tasks.find((t) => t.id === taskId);
+  if (!task || !STATUSES.includes(targetStatus)) return false;
+  task.status = targetStatus;
+  reindexStatus(targetStatus);
+  const maxOrder = state.tasks
+    .filter((t) => t.status === targetStatus)
+    .reduce((m, t) => Math.max(m, num(t.kanban_order, 0)), 0);
+  task.kanban_order = maxOrder + 1;
+  reindexStatus(targetStatus);
+  return true;
+}
+
+function moveTaskBefore(taskId, beforeTaskId, targetStatus) {
+  const task = state.tasks.find((t) => t.id === taskId);
+  if (!task || taskId === beforeTaskId || !STATUSES.includes(targetStatus)) return false;
+  const beforeTask = state.tasks.find((t) => t.id === beforeTaskId);
+  if (!beforeTask || beforeTask.status !== targetStatus) return false;
+
+  const ordered = sortKanbanItems(
+    state.tasks.filter((t) => t.status === targetStatus && t.id !== taskId)
+  );
+  const output = [];
+  let inserted = false;
+  ordered.forEach((t) => {
+    if (t.id === beforeTaskId) {
+      output.push(task);
+      inserted = true;
+    }
+    output.push(t);
+  });
+  if (!inserted) output.push(task);
+
+  task.status = targetStatus;
+  output.forEach((t, idx) => { t.kanban_order = idx + 1; });
+  return true;
 }
 
 function refreshAutoDebt() {
@@ -248,8 +327,26 @@ function refreshAutoDebt() {
 }
 
 async function loadState() {
-  const res = await fetch("/api/state");
-  state = await res.json();
+  let loaded = null;
+  const status = document.getElementById("dataStatus");
+
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) loaded = JSON.parse(raw);
+  } catch {
+    loaded = null;
+  }
+
+  if (!loaded) {
+    try {
+      const res = await fetch("/api/state");
+      if (res.ok) loaded = await res.json();
+    } catch {
+      loaded = null;
+    }
+  }
+
+  state = loaded && typeof loaded === "object" ? loaded : {};
 
   if (state.daily_hours == null) {
     const weekly = num(state.weekly_hours, 40);
@@ -258,17 +355,14 @@ async function loadState() {
     state.daily_hours = num(state.daily_hours, 8);
   }
 
-  if (!state.budgets) state.budgets = {};
-  if (!state.tasks) state.tasks = [];
-  if (!state.active_timer) state.active_timer = null;
-  if (state.log_project_id == null) state.log_project_id = null;
-  if (!state.last_week_key) state.last_week_key = currentWeekKey();
+  normalizeStateShape();
 
   DOMAINS.forEach((d) => {
     if (state.budgets[d] == null) state.budgets[d] = 0;
   });
 
   state.tasks = state.tasks.map(normalizeTask);
+  ensureKanbanOrder();
   if (!state.log_project_id && state.tasks.length > 0) {
     state.log_project_id = state.tasks[0].id;
   } else if (state.log_project_id) {
@@ -276,23 +370,89 @@ async function loadState() {
     if (!exists) state.log_project_id = state.tasks.length > 0 ? state.tasks[0].id : null;
   }
 
+  if (status) setDataStatus("Local auto-save is enabled.");
   render();
 }
 
-async function saveState() {
-  const res = await fetch("/api/state", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(state),
-  });
-  const out = await res.json();
+function persistStateSync(updateUi = true) {
   const el = document.getElementById("saveState");
-  el.textContent = out.ok ? `Saved ${new Date().toLocaleTimeString()}` : `Save error: ${out.error || "unknown"}`;
+  state.updated_at = new Date().toISOString();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  if (updateUi && el) {
+    el.textContent = `Saved locally ${new Date().toLocaleTimeString()}`;
+  }
+}
+
+async function saveState() {
+  const el = document.getElementById("saveState");
+  try {
+    persistStateSync(true);
+  } catch (err) {
+    const msg = err && err.message ? err.message : "unknown";
+    if (el) el.textContent = `Local save error: ${msg}`;
+  }
 }
 
 function scheduleSave() {
   if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(saveState, 250);
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    saveState();
+  }, 250);
+}
+
+function setDataStatus(text, klass = "muted") {
+  const el = document.getElementById("dataStatus");
+  if (!el) return;
+  el.textContent = text;
+  el.className = klass;
+}
+
+function exportStateJson() {
+  try {
+    const copy = { ...state, updated_at: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(copy, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `timebudget-state-${todayIso()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setDataStatus("Exported JSON backup.", "good");
+  } catch (err) {
+    const msg = err && err.message ? err.message : "unknown";
+    setDataStatus(`Export error: ${msg}`, "bad");
+  }
+}
+
+async function importStateJson(file) {
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const incoming = JSON.parse(text);
+    if (!incoming || typeof incoming !== "object") throw new Error("JSON must be an object");
+    if (!incoming.budgets || !Array.isArray(incoming.tasks)) throw new Error("Missing budgets/tasks");
+
+    state = incoming;
+    if (state.daily_hours == null) {
+      const weekly = num(state.weekly_hours, 40);
+      state.daily_hours = weekly / 5;
+    } else {
+      state.daily_hours = num(state.daily_hours, 8);
+    }
+    normalizeStateShape();
+    DOMAINS.forEach((d) => {
+      if (state.budgets[d] == null) state.budgets[d] = 0;
+    });
+    state.tasks = state.tasks.map(normalizeTask);
+    if (!state.log_project_id && state.tasks.length > 0) state.log_project_id = state.tasks[0].id;
+    await saveState();
+    render();
+    setDataStatus(`Imported ${file.name}.`, "good");
+  } catch (err) {
+    const msg = err && err.message ? err.message : "invalid json";
+    setDataStatus(`Import error: ${msg}`, "bad");
+  }
 }
 
 function renderWeekly() {
@@ -344,9 +504,23 @@ function renderKanbanDashboard() {
     heading.textContent = status;
     col.appendChild(heading);
 
-    const items = state.tasks
-      .filter((t) => t.status === status)
-      .sort((a, b) => a.title.localeCompare(b.title));
+    const items = sortKanbanItems(state.tasks.filter((t) => t.status === status));
+
+    col.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      col.classList.add("drop-target");
+    });
+    col.addEventListener("dragleave", () => col.classList.remove("drop-target"));
+    col.addEventListener("drop", (e) => {
+      e.preventDefault();
+      col.classList.remove("drop-target");
+      const taskId = e.dataTransfer.getData("text/task-id") || draggingTaskId;
+      if (!taskId) return;
+      if (moveTaskToColumnEnd(taskId, status)) {
+        render();
+        scheduleSave();
+      }
+    });
 
     if (items.length === 0) {
       const empty = document.createElement("div");
@@ -361,6 +535,35 @@ function renderKanbanDashboard() {
         const debt = makeUpDebtHours(t);
         const splitTxt = t.domain === "Research" ? ` | split=${fmt(t.research_split)}%` : "";
         card.innerHTML = `<strong>${t.title}</strong><br/><span class="muted">${t.domain} | ${t.impact} impact | ${urgency} pressure${splitTxt}</span>${debt > 0 ? `<br/><span class="bad">Debt: ${fmt(debt)}h</span>` : ""}`;
+        card.draggable = true;
+        card.addEventListener("dragstart", (e) => {
+          draggingTaskId = t.id;
+          card.classList.add("dragging");
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("text/task-id", t.id);
+        });
+        card.addEventListener("dragend", () => {
+          draggingTaskId = null;
+          card.classList.remove("dragging");
+          document.querySelectorAll(".drop-target").forEach((el) => el.classList.remove("drop-target"));
+        });
+        card.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          card.classList.add("drop-target");
+        });
+        card.addEventListener("dragleave", () => card.classList.remove("drop-target"));
+        card.addEventListener("drop", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          card.classList.remove("drop-target");
+          const taskId = e.dataTransfer.getData("text/task-id") || draggingTaskId;
+          if (!taskId) return;
+          if (moveTaskBefore(taskId, t.id, status)) {
+            render();
+            scheduleSave();
+          }
+        });
 
         const actions = document.createElement("div");
         actions.className = "kanban-actions";
@@ -395,7 +598,11 @@ function renderKanbanDashboard() {
             state.log_project_id = state.tasks.length > 0 ? state.tasks[0].id : null;
           }
           render();
-          scheduleSave();
+          try {
+            persistStateSync(true);
+          } catch {
+            scheduleSave();
+          }
         });
 
         actions.appendChild(move);
@@ -467,7 +674,6 @@ function renderExecutionLog() {
   const body = document.getElementById("logBody");
   body.innerHTML = "";
   const weekDays = currentWeekDatesMonFri();
-  const today = todayIso();
 
   const summary = document.getElementById("executionDebtSummary");
   const researchTarget = Math.max(0, num(state.budgets.Research, 0));
@@ -488,29 +694,13 @@ function renderExecutionLog() {
   });
   select.onchange = () => {
     state.log_project_id = select.value || null;
-    renderExecutionLog();
+    render();
     scheduleSave();
   };
-
-  const progressText = document.getElementById("logProgressText");
-  const progressFill = document.getElementById("logProgressFill");
   const t = state.tasks.find((x) => x.id === state.log_project_id) || null;
-  if (!t) {
-    progressText.textContent = "No project selected.";
-    progressFill.style.width = "0%";
-    return;
-  }
-
-  const plannedTotal = weeklyPlannedTotal(t);
-  const actualTotal = weeklyActualTotal(t);
-  const pct = plannedTotal <= 0 ? 0 : Math.min(100, (actualTotal / plannedTotal) * 100);
-  progressText.textContent = `${t.title}: ${fmt(actualTotal)}h / ${fmt(plannedTotal)}h (${fmt(pct)}%)`;
-  progressFill.style.width = `${pct}%`;
+  if (!t) return;
 
   for (let i = 0; i < WEEKDAYS.length; i += 1) {
-    const dayIso = weekDays[i];
-    const isPastDay = dayIso < today;
-
     const tr = document.createElement("tr");
 
     const dayTd = document.createElement("td");
@@ -529,46 +719,7 @@ function renderExecutionLog() {
     const actualTd = document.createElement("td");
     actualTd.innerHTML = `<span class="actual-value">${fmt(num(t.daily_actual[i], 0))}</span>`;
 
-    const actTd = document.createElement("td");
-    const info = document.createElement("div");
-    info.className = "timer-info";
-
-    const btn = document.createElement("button");
-    btn.className = "timer-btn";
-
-    const runningHere = Boolean(
-      state.active_timer &&
-      state.active_timer.task_id === t.id &&
-      state.active_timer.day_index === i
-    );
-
-    if (runningHere) {
-      btn.textContent = "Stop";
-      btn.addEventListener("click", () => stopActiveTimer());
-      const started = parseIsoDate(state.active_timer.started_at);
-      if (started) info.textContent = `Running: ${formatElapsed(Date.now() - started.getTime())}`;
-    } else if (isPastDay) {
-      btn.textContent = "Locked";
-      btn.disabled = true;
-      btn.classList.add("actual-locked");
-      info.textContent = "Past day";
-    } else if (dayIso > today) {
-      btn.textContent = "Not Yet";
-      btn.disabled = true;
-      info.textContent = "Future day";
-    } else if (state.active_timer) {
-      btn.textContent = "Busy";
-      btn.disabled = true;
-      info.textContent = "Another timer running";
-    } else {
-      btn.textContent = "Start";
-      btn.addEventListener("click", () => startTimer(t.id, i));
-    }
-
-    actTd.appendChild(info);
-    actTd.appendChild(btn);
-
-    [dayTd, planTd, startTd, endTd, actualTd, actTd].forEach((td) => tr.appendChild(td));
+    [dayTd, planTd, startTd, endTd, actualTd].forEach((td) => tr.appendChild(td));
     body.appendChild(tr);
   }
 }
@@ -602,8 +753,10 @@ function addProject() {
     committed_hours: 0,
     baseline_deadline: deadline,
     debt_hours: 0,
+    kanban_order: 0,
   });
   state.tasks.push(task);
+  ensureKanbanOrder();
 
   titleInput.value = "";
   impactInput.value = domainInput.value === "Research" ? "High" : "Medium";
@@ -640,7 +793,13 @@ function startTimer(taskId, dayIndex) {
   if (!t) return;
   const now = new Date();
   t.daily_start[dayIndex] = toClockLocal(now);
-  state.active_timer = { task_id: taskId, day_index: dayIndex, started_at: now.toISOString() };
+  state.active_timer = {
+    task_id: taskId,
+    day_index: dayIndex,
+    started_at: now.toISOString(),
+    mode: "work",
+    duration_min: Math.max(1, num(state.pomodoro_work_min, 25)),
+  };
   render();
   scheduleSave();
 }
@@ -661,6 +820,93 @@ function stopActiveTimer(renderAfter = true) {
   scheduleSave();
 }
 
+function renderProjectProgress() {
+  const progressText = document.getElementById("logProgressText");
+  const progressFill = document.getElementById("logProgressFill");
+  const t = state.tasks.find((x) => x.id === state.log_project_id) || null;
+  if (!progressText || !progressFill) return;
+  if (!t) {
+    progressText.textContent = "No project selected.";
+    progressFill.style.width = "0%";
+    return;
+  }
+  const plannedTotal = weeklyPlannedTotal(t);
+  const actualTotal = weeklyActualTotal(t);
+  const pct = plannedTotal <= 0 ? 0 : Math.min(100, (actualTotal / plannedTotal) * 100);
+  progressText.textContent = `${t.title}: ${fmt(actualTotal)}h / ${fmt(plannedTotal)}h (${fmt(pct)}%)`;
+  progressFill.style.width = `${pct}%`;
+}
+
+function startPomodoro() {
+  if (state.active_timer) return;
+  const t = state.tasks.find((x) => x.id === state.log_project_id);
+  if (!t) return;
+  const today = todayIso();
+  const weekDays = currentWeekDatesMonFri();
+  const idx = weekDays.findIndex((d) => d === today);
+  if (idx < 0) return;
+  startTimer(t.id, idx);
+}
+
+function stopPomodoro() {
+  stopActiveTimer(true);
+}
+
+function renderPomodoro() {
+  const workInput = document.getElementById("pomodoroWorkMin");
+  const breakInput = document.getElementById("pomodoroBreakMin");
+  const startBtn = document.getElementById("pomodoroStartBtn");
+  const stopBtn = document.getElementById("pomodoroStopBtn");
+  const status = document.getElementById("pomodoroStatusText");
+  const fill = document.getElementById("pomodoroProgressFill");
+  if (!workInput || !breakInput || !startBtn || !stopBtn || !status || !fill) return;
+
+  workInput.value = String(Math.max(1, num(state.pomodoro_work_min, 25)));
+  breakInput.value = String(Math.max(1, num(state.pomodoro_break_min, 5)));
+  workInput.onchange = () => {
+    state.pomodoro_work_min = Math.max(1, num(workInput.value, 25));
+    scheduleSave();
+    renderPomodoro();
+  };
+  breakInput.onchange = () => {
+    state.pomodoro_break_min = Math.max(1, num(breakInput.value, 5));
+    scheduleSave();
+    renderPomodoro();
+  };
+
+  const hasFocus = Boolean(state.tasks.find((x) => x.id === state.log_project_id));
+  startBtn.disabled = !hasFocus || Boolean(state.active_timer);
+  stopBtn.disabled = !state.active_timer;
+
+  if (!state.active_timer) {
+    fill.style.width = "0%";
+    status.textContent = hasFocus
+      ? `Ready: ${fmt(state.pomodoro_work_min)}m work + ${fmt(state.pomodoro_break_min)}m break`
+      : "Select a focus project first.";
+    return;
+  }
+
+  const started = parseIsoDate(state.active_timer.started_at);
+  if (!started) {
+    fill.style.width = "0%";
+    status.textContent = "Timer state invalid.";
+    return;
+  }
+  const durationMs = Math.max(1, num(state.active_timer.duration_min, state.pomodoro_work_min)) * 60 * 1000;
+  const elapsedMs = Date.now() - started.getTime();
+  const pct = Math.max(0, Math.min(100, (elapsedMs / durationMs) * 100));
+  fill.style.width = `${pct}%`;
+  const remainingMs = Math.max(0, durationMs - elapsedMs);
+  status.textContent = `Work session running: ${formatElapsed(remainingMs)} left`;
+
+  if (elapsedMs >= durationMs) {
+    stopActiveTimer(false);
+    status.textContent = `Work session complete. Take ${fmt(state.pomodoro_break_min)}m break.`;
+    fill.style.width = "100%";
+    scheduleSave();
+  }
+}
+
 function render() {
   const rolled = autoAdvanceWeekIfNeeded();
   if (rolled) scheduleSave();
@@ -672,6 +918,8 @@ function render() {
   renderBudgets();
   renderKanbanDashboard();
   renderExecutionLog();
+  renderPomodoro();
+  renderProjectProgress();
 
   if (timerTickHandle) {
     clearTimeout(timerTickHandle);
@@ -682,7 +930,29 @@ function render() {
 
 window.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("addBtn").addEventListener("click", addProject);
+  document.getElementById("exportJsonBtn").addEventListener("click", exportStateJson);
+  document.getElementById("importJsonInput").addEventListener("change", async (e) => {
+    const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+    await importStateJson(file);
+    e.target.value = "";
+  });
+  document.getElementById("pomodoroStartBtn").addEventListener("click", startPomodoro);
+  document.getElementById("pomodoroStopBtn").addEventListener("click", stopPomodoro);
   document.getElementById("saveEditBtn").addEventListener("click", saveEditor);
   document.getElementById("cancelEditBtn").addEventListener("click", closeEditor);
   await loadState();
+});
+
+window.addEventListener("beforeunload", () => {
+  try { persistStateSync(false); } catch {}
+});
+
+window.addEventListener("pagehide", () => {
+  try { persistStateSync(false); } catch {}
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") {
+    try { persistStateSync(false); } catch {}
+  }
 });

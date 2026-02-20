@@ -70,7 +70,10 @@ th, td { border-bottom: 1px solid var(--line); padding: 6px; text-align: left; w
   background: #fff;
   padding: 8px;
   margin: 6px 0;
+  cursor: grab;
 }
+.kanban-card.dragging { opacity: 0.55; cursor: grabbing; }
+.drop-target { outline: 2px dashed var(--accent); outline-offset: 2px; }
 .kanban-actions {
   margin-top: 8px;
   display: flex;
@@ -117,6 +120,26 @@ th, td { border-bottom: 1px solid var(--line); padding: 6px; text-align: left; w
 }
 .progress-wrap {
   margin: 6px 0 12px;
+}
+.data-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.import-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px;
+  background: #fff;
+}
+.import-label input {
+  padding: 0;
+  border: none;
+  background: transparent;
 }
 .progress-bar {
   width: 100%;
